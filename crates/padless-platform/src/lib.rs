@@ -4,6 +4,10 @@ use padless_core::Engine;
 
 mod error;
 
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+use macos as native;
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]
@@ -11,7 +15,7 @@ use windows as native;
 
 pub use error::PlatformError;
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 pub use native::{open, supports_trigger};
 
 pub trait KeyboardBackend {
