@@ -1,0 +1,25 @@
+[package]
+name = "padless"
+description = "Type Alt codes from the number row on keyboards without a numeric keypad"
+readme = "../../README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+ctrlc.workspace = true
+directories.workspace = true
+padless-core.workspace = true
+padless-platform.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true
