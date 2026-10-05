@@ -1,0 +1,47 @@
+name: Bug report
+description: padless typed the wrong thing, broke a shortcut, or failed to start.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not paste logs or text that contain passwords or other private input.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: padless version
+      description: Output of `padless --version`.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS and version. On Linux, also the desktop or compositor and whether the session is X11 or Wayland.
+    validations:
+      required: true
+  - type: input
+    id: layout
+    attributes:
+      label: Keyboard layout
+      placeholder: US, German QWERTZ, French AZERTY, ...
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Your config.toml, if you have one.
+      render: toml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output
+      description: Output of `padless run -v` around the problem. padless never logs key contents.
+      render: text
