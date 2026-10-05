@@ -45,7 +45,7 @@ pub struct Engine {
     machine: Machine,
     resolver: Resolver,
     swallowed: KeySet,
-    held_modifiers: KeySet,
+    down: KeySet,
 }
 
 enum Machine {
@@ -66,27 +66,23 @@ impl Engine {
             machine,
             resolver: config.resolver(),
             swallowed: KeySet::default(),
-            held_modifiers: KeySet::default(),
+            down: KeySet::default(),
         }
     }
 
     pub fn handle(&mut self, event: KeyEvent, now: Instant) -> Response {
-        if event.key.is_modifier() {
-            match event.action {
-                KeyAction::Press => self.held_modifiers.insert(event.key),
-                KeyAction::Release => {
-                    self.held_modifiers.remove(event.key);
-                }
+        let repeat = match event.action {
+            KeyAction::Press => !self.down.insert(event.key),
+            KeyAction::Release => {
+                self.down.remove(event.key);
+                false
             }
-        }
-        let modifiers: Modifiers = self
-            .held_modifiers
-            .iter()
-            .filter_map(Key::modifier)
-            .collect();
+        };
+        let modifiers: Modifiers = self.down.iter().filter_map(Key::modifier).collect();
         let context = Context {
             swallowed: &mut self.swallowed,
             resolver: &self.resolver,
+            repeat,
         };
         match &mut self.machine {
             Machine::Hold(hold) => hold.handle(event, context),
@@ -98,6 +94,7 @@ impl Engine {
 struct Context<'a> {
     swallowed: &'a mut KeySet,
     resolver: &'a Resolver,
+    repeat: bool,
 }
 
 impl Context<'_> {
@@ -124,9 +121,12 @@ impl KeySet {
         self.0.contains(&key)
     }
 
-    fn insert(&mut self, key: Key) {
-        if !self.contains(key) {
+    fn insert(&mut self, key: Key) -> bool {
+        if self.contains(key) {
+            false
+        } else {
             self.0.push(key);
+            true
         }
     }
 

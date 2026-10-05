@@ -2,7 +2,7 @@ use std::mem;
 
 use super::{Context, DigitBuffer, Output, Response};
 use crate::config::Trigger;
-use crate::key::{KeyAction, KeyEvent};
+use crate::key::{Key, KeyAction, KeyEvent};
 
 pub(super) struct Hold {
     trigger: Trigger,
@@ -20,13 +20,42 @@ enum State {
 
 #[derive(Default)]
 struct Episode {
-    swallowed: Vec<KeyEvent>,
+    held: Vec<Held>,
     digits: DigitBuffer,
 }
 
+#[derive(Clone, Copy)]
+struct Held {
+    event: KeyEvent,
+    delivered_before: bool,
+}
+
 impl Episode {
-    fn pressed(&self, event: KeyEvent) -> bool {
-        self.swallowed.contains(&KeyEvent::press(event.key))
+    fn hold(&mut self, event: KeyEvent) {
+        self.held.push(Held {
+            event,
+            delivered_before: false,
+        });
+    }
+
+    fn hold_release_of_delivered(&mut self, event: KeyEvent) {
+        self.held.push(Held {
+            event,
+            delivered_before: true,
+        });
+    }
+
+    fn holds_press_of(&self, key: Key) -> bool {
+        self.held
+            .iter()
+            .any(|held| !held.delivered_before && held.event == KeyEvent::press(key))
+    }
+
+    fn releases_of_delivered(&self) -> impl Iterator<Item = KeyEvent> + '_ {
+        self.held
+            .iter()
+            .filter(|held| held.delivered_before)
+            .map(|held| held.event)
     }
 }
 
@@ -54,7 +83,7 @@ impl Hold {
                 let response = if self.trigger.passes_through() {
                     Response::Pass
                 } else {
-                    episode.swallowed.push(event);
+                    episode.hold(event);
                     Response::swallow()
                 };
                 self.state = State::Armed(episode);
@@ -64,25 +93,29 @@ impl Hold {
                 self.state = State::Armed(episode);
                 self.trigger_repeat()
             }
-            state if context.swallowed.contains(event.key) => {
-                self.state = state;
-                Response::swallow()
-            }
             State::Armed(mut episode) => {
-                if let Some(digit) = event.key.digit() {
+                if context.swallowed.contains(event.key) {
+                    episode.hold(event);
+                } else if let Some(digit) = event.key.digit()
+                    && !context.repeat
+                {
                     episode.digits.push(digit);
-                    episode.swallowed.push(event);
+                    episode.hold(event);
                     context.swallowed.insert(event.key);
-                    self.state = State::Armed(episode);
-                    Response::swallow()
                 } else {
                     self.state = State::Bypassed;
-                    replay(episode, event, &mut context)
+                    return replay(episode, event, &mut context);
                 }
+                self.state = State::Armed(episode);
+                Response::swallow()
             }
             state => {
                 self.state = state;
-                Response::Pass
+                if context.swallowed.contains(event.key) {
+                    Response::swallow()
+                } else {
+                    Response::Pass
+                }
             }
         }
     }
@@ -94,12 +127,15 @@ impl Hold {
             State::Bypassed if is_trigger => Response::Pass,
             State::Armed(mut episode) => {
                 let response = if context.swallowed.remove(event.key) {
-                    if episode.pressed(event) {
-                        episode.swallowed.push(event);
+                    if episode.holds_press_of(event.key) {
+                        episode.hold(event);
                     }
                     Response::swallow()
-                } else {
+                } else if episode.held.is_empty() {
                     Response::Pass
+                } else {
+                    episode.hold_release_of_delivered(event);
+                    Response::swallow()
                 };
                 self.state = State::Armed(episode);
                 response
@@ -123,7 +159,7 @@ impl Hold {
         if episode.digits.count() < self.min_digits {
             return replay(episode, release, context);
         }
-        let mut outputs = Vec::new();
+        let mut outputs: Vec<Output> = episode.releases_of_delivered().map(Output::Key).collect();
         if self.trigger.passes_through() {
             outputs.push(Output::Mask);
             outputs.push(Output::Key(release));
@@ -134,12 +170,15 @@ impl Hold {
 }
 
 fn replay(episode: Episode, current: KeyEvent, context: &mut Context<'_>) -> Response {
-    for event in &episode.swallowed {
-        context.swallowed.remove(event.key);
+    for held in &episode.held {
+        if !held.delivered_before {
+            context.swallowed.remove(held.event.key);
+        }
     }
     let outputs = episode
-        .swallowed
+        .held
         .into_iter()
+        .map(|held| held.event)
         .chain([current])
         .map(Output::Key)
         .collect();
@@ -318,6 +357,8 @@ mod tests {
             responses[5],
             Response::Replace(keys(&[
                 press(digit(6)),
+                press(digit(6)),
+                press(digit(6)),
                 release(digit(6)),
                 release(Key::LeftAlt)
             ]))
@@ -351,6 +392,73 @@ mod tests {
         assert_eq!(responses[5], Response::swallow());
         assert_eq!(responses[6], Response::swallow());
         assert_eq!(responses[7], Response::Pass);
+    }
+
+    #[test]
+    fn autorepeat_of_digit_held_before_trigger_cancels() {
+        let mut engine = engine(Trigger::LeftAlt, 1);
+        let responses = feed(
+            &mut engine,
+            &[
+                press(digit(8)),
+                press(Key::LeftAlt),
+                press(digit(8)),
+                release(Key::LeftAlt),
+                release(digit(8)),
+            ],
+        );
+        assert!(responses.iter().all(|response| *response == Response::Pass));
+    }
+
+    #[test]
+    fn releases_of_delivered_keys_keep_their_order() {
+        let mut engine = engine(Trigger::LeftAlt, 2);
+        let responses = feed(
+            &mut engine,
+            &[
+                press(Key::LeftShift),
+                press(Key::LeftAlt),
+                press(digit(0)),
+                release(Key::LeftShift),
+                press(Key::Letter(b'x')),
+            ],
+        );
+        assert_eq!(responses[3], Response::swallow());
+        assert_eq!(
+            responses[4],
+            Response::Replace(keys(&[
+                press(digit(0)),
+                release(Key::LeftShift),
+                press(Key::Letter(b'x')),
+            ]))
+        );
+    }
+
+    #[test]
+    fn releases_of_delivered_keys_are_flushed_before_commit() {
+        let mut engine = engine(Trigger::LeftAlt, 2);
+        let responses = feed(
+            &mut engine,
+            &[
+                press(Key::LeftShift),
+                press(Key::LeftAlt),
+                press(digit(6)),
+                release(Key::LeftShift),
+                release(digit(6)),
+                press(digit(5)),
+                release(digit(5)),
+                release(Key::LeftAlt),
+            ],
+        );
+        assert_eq!(
+            responses[7],
+            Response::Replace(vec![
+                Output::Key(release(Key::LeftShift)),
+                Output::Mask,
+                Output::Key(release(Key::LeftAlt)),
+                text("A"),
+            ])
+        );
     }
 
     #[test]

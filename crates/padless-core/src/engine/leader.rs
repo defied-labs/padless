@@ -48,7 +48,7 @@ impl Leader {
         let key = event.key;
         match &mut self.state {
             State::Idle => {
-                if key == self.chord.key && modifiers == self.chord.modifiers {
+                if !context.repeat && key == self.chord.key && modifiers == self.chord.modifiers {
                     context.swallowed.insert(key);
                     self.state = State::Capturing {
                         digits: DigitBuffer::default(),
@@ -60,6 +60,11 @@ impl Leader {
                 }
             }
             State::Capturing { digits, last_input } => match key {
+                _ if key.is_modifier() => Response::Pass,
+                _ if context.repeat => {
+                    self.state = State::Idle;
+                    Response::Pass
+                }
                 Key::Digit(digit) => {
                     digits.push(digit);
                     *last_input = now;
@@ -77,7 +82,6 @@ impl Leader {
                     self.state = State::Idle;
                     Response::swallow()
                 }
-                _ if key.is_modifier() => Response::Pass,
                 _ => {
                     self.state = State::Idle;
                     Response::Pass
@@ -259,6 +263,19 @@ mod tests {
         assert_eq!(harness.release(Key::LeftShift), Response::Pass);
         harness.digits("5");
         assert_eq!(harness.tap(Key::Enter), text("A"));
+    }
+
+    #[test]
+    fn autorepeat_never_starts_or_feeds_a_capture() {
+        let mut harness = Harness::new("ctrl+shift+u");
+        assert_eq!(harness.press(Key::Letter(b'u')), Response::Pass);
+        assert_eq!(harness.press(Key::LeftCtrl), Response::Pass);
+        assert_eq!(harness.press(Key::LeftShift), Response::Pass);
+        assert_eq!(harness.press(Key::Letter(b'u')), Response::Pass);
+        assert_eq!(harness.release(Key::Letter(b'u')), Response::Pass);
+        assert_eq!(harness.press(Key::Enter), Response::Pass);
+        assert_eq!(harness.press(Key::Letter(b'u')), Response::swallow());
+        assert_eq!(harness.press(Key::Enter), Response::Pass);
     }
 
     #[test]
