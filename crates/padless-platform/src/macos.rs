@@ -468,6 +468,6 @@ mod tests {
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].len(), 19);
         assert_eq!(chunks[1].len(), 3);
-        assert!(text_chunks("").is_empty());
+        assert_eq!(text_chunks(""), Vec::<Vec<u16>>::new());
     }
 }

@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn warns_about_altgr_and_shortcuts() {
-        assert!(Config::default().warnings().is_empty());
+        assert_eq!(Config::default().warnings(), Vec::<ConfigWarning>::new());
         assert_eq!(
             parse("trigger = \"right-alt\"\nmin_digits = 1").warnings(),
             [
@@ -514,10 +514,9 @@ mod tests {
             parse("mode = \"leader\"\n[leader]\nchord = \"ctrl+alt+u\"").warnings(),
             [ConfigWarning::ChordMatchesAltGr]
         );
-        assert!(
-            parse("mode = \"leader\"\ntrigger = \"right-alt\"")
-                .warnings()
-                .is_empty()
+        assert_eq!(
+            parse("mode = \"leader\"\ntrigger = \"right-alt\"").warnings(),
+            Vec::<ConfigWarning>::new()
         );
     }
 
