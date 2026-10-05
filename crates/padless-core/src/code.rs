@@ -1,13 +1,15 @@
 use std::fmt;
 use std::str::FromStr;
 
+use serde::Deserialize;
 use thiserror::Error;
 
 use crate::key::Digit;
 
 pub const MAX_CODE_DIGITS: usize = 10;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
 pub struct Code(Vec<Digit>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
