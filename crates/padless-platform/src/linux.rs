@@ -1,5 +1,6 @@
 mod keymap;
 mod text;
+mod x11;
 
 use std::fs;
 use std::io;
@@ -290,15 +291,23 @@ impl LinuxBackend {
     }
 
     fn apply(&mut self, outputs: &[Output]) -> io::Result<()> {
+        let mut after_key_events = false;
         for output in outputs {
             match output {
                 Output::Key(event) => {
                     if let Some(code) = keymap::code_for_key(event.key) {
                         self.output.key(code, event.action)?;
+                        after_key_events = true;
                     }
                 }
-                Output::Mask => self.output.tap(keymap::MASK)?,
-                Output::Text(text) => self.text.type_text(text, &mut self.output)?,
+                Output::Mask => {
+                    self.output.tap(keymap::MASK)?;
+                    after_key_events = true;
+                }
+                Output::Text(text) => {
+                    self.text
+                        .type_text(text, &mut self.output, after_key_events)?;
+                }
             }
         }
         Ok(())
