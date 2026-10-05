@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/padless-core"]
+members = ["crates/padless-core", "crates/padless-platform"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,10 +14,13 @@ categories = ["command-line-utilities", "text-processing"]
 
 [workspace.dependencies]
 padless-core = { path = "crates/padless-core", version = "0.1.0" }
+padless-platform = { path = "crates/padless-platform", version = "0.1.0" }
 proptest = "1.11"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
 toml = { version = "1.1", default-features = false, features = ["std", "parse", "serde"] }
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+windows = "0.62"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
