@@ -26,7 +26,9 @@ windows = { workspace = true, features = [
 
 [target.'cfg(target_os = "linux")'.dependencies]
 evdev = "0.13"
-rustix = { version = "1.1", features = ["event"] }
+rustix = { version = "1.1", features = ["event", "fs"] }
+wayland-client = "0.31"
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
 x11rb = { version = "0.14", features = ["xtest"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

@@ -1,5 +1,6 @@
 mod keymap;
 mod text;
+mod wayland;
 mod x11;
 
 use std::fs;
