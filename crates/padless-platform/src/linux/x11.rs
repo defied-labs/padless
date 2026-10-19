@@ -95,12 +95,11 @@ impl X11Typer {
         for (index, c) in text.chars().enumerate() {
             let slot = index % self.scratch.len();
             if index > 0 && slot == 0 {
-                self.sync()?;
+                self.connection.flush()?;
                 thread::sleep(KEYCODE_REUSE_DELAY);
             }
             let keycode = self.scratch[slot];
             self.remap(keycode, keysym_for(c))?;
-            self.sync()?;
             for event in [KEY_PRESS_EVENT, KEY_RELEASE_EVENT] {
                 self.connection.xtest_fake_input(
                     event,
@@ -113,18 +112,14 @@ impl X11Typer {
                 )?;
             }
         }
-        self.sync()
+        self.connection.flush()?;
+        Ok(())
     }
 
     fn remap(&self, keycode: Keycode, keysym: Keysym) -> Result<(), X11Error> {
         let keysyms = vec![keysym; usize::from(self.keysyms_per_keycode)];
         self.connection
             .change_keyboard_mapping(1, keycode, self.keysyms_per_keycode, &keysyms)?;
-        Ok(())
-    }
-
-    fn sync(&self) -> Result<(), X11Error> {
-        self.connection.get_input_focus()?.reply()?;
         Ok(())
     }
 }

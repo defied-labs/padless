@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use rustix::fs::{MemfdFlags, memfd_create};
 use thiserror::Error;
+use wayland_client::backend::WaylandError as WaylandBackendError;
 use wayland_client::globals::{BindError, GlobalError, GlobalListContents, registry_queue_init};
 use wayland_client::protocol::{wl_registry, wl_seat};
 use wayland_client::{
@@ -30,6 +31,8 @@ pub(super) enum WaylandError {
     Unsupported(#[from] BindError),
     #[error(transparent)]
     Dispatch(#[from] DispatchError),
+    #[error(transparent)]
+    Protocol(#[from] WaylandBackendError),
     #[error("failed to share the keymap with the compositor")]
     Keymap(#[from] io::Error),
 }
@@ -91,7 +94,7 @@ impl WaylandTyper {
                     self.keyboard.key(time, key, KEY_RELEASED);
                 }
             }
-            self.queue.roundtrip(&mut State)?;
+            self.queue.flush()?;
             start = end;
         }
         Ok(())
