@@ -1,3 +1,4 @@
+use std::env;
 use std::thread;
 use std::time::Duration;
 
@@ -24,6 +25,8 @@ pub(super) enum X11Error {
     Connection(#[from] ConnectionError),
     #[error(transparent)]
     Reply(#[from] ReplyError),
+    #[error("DISPLAY is unset or names a remote X server")]
+    NotLocal,
     #[error("the X server does not support the XTEST extension")]
     MissingXTest,
     #[error("the X server reported no screen for this display")]
@@ -41,7 +44,11 @@ pub(super) struct X11Typer {
 
 impl X11Typer {
     pub(super) fn connect() -> Result<Self, X11Error> {
-        let (connection, screen) = x11rb::connect(None)?;
+        let display = env::var("DISPLAY")
+            .ok()
+            .and_then(|display| local_display(&display))
+            .ok_or(X11Error::NotLocal)?;
+        let (connection, screen) = x11rb::connect(Some(&display))?;
         if connection
             .extension_information(xtest::X11_EXTENSION_NAME)?
             .is_none()
@@ -131,6 +138,11 @@ impl Drop for X11Typer {
     }
 }
 
+fn local_display(display: &str) -> Option<String> {
+    let number = display.strip_prefix("unix").unwrap_or(display);
+    number.starts_with(':').then(|| format!("unix{number}"))
+}
+
 fn keysym_for(c: char) -> Keysym {
     match c {
         '\u{8}' => 0xFF08,
@@ -146,6 +158,16 @@ fn keysym_for(c: char) -> Keysym {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_local_displays_are_used() {
+        assert_eq!(local_display(":0").as_deref(), Some("unix:0"));
+        assert_eq!(local_display(":1.0").as_deref(), Some("unix:1.0"));
+        assert_eq!(local_display("unix:2").as_deref(), Some("unix:2"));
+        assert_eq!(local_display("localhost:10.0"), None);
+        assert_eq!(local_display("192.168.1.5:0"), None);
+        assert_eq!(local_display(""), None);
+    }
 
     #[test]
     fn latin1_keysyms_equal_code_points() {
