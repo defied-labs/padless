@@ -1,8 +1,8 @@
 use std::time::{Duration, Instant};
 
-use super::{Context, DigitBuffer, Response};
+use super::{Context, DigitBuffer, Output, Response};
 use crate::config::Chord;
-use crate::key::{Key, KeyEvent, Modifiers};
+use crate::key::{Key, KeyEvent, Modifier, Modifiers};
 
 pub(super) struct Leader {
     chord: Chord,
@@ -24,6 +24,15 @@ impl Leader {
             chord,
             timeout,
             state: State::Idle,
+        }
+    }
+
+    fn chord_response(&self) -> Response {
+        let modifiers = self.chord.modifiers;
+        if modifiers.contains(Modifier::Alt) || modifiers.contains(Modifier::Meta) {
+            Response::Replace(vec![Output::Mask])
+        } else {
+            Response::swallow()
         }
     }
 
@@ -54,7 +63,7 @@ impl Leader {
                         digits: DigitBuffer::default(),
                         last_input: now,
                     };
-                    Response::swallow()
+                    self.chord_response()
                 } else {
                     Response::Pass
                 }
@@ -210,6 +219,20 @@ mod tests {
         assert_eq!(harness.press(Key::LeftShift), Response::Pass);
         assert_eq!(harness.press(Key::LeftAlt), Response::Pass);
         assert_eq!(harness.press(Key::Letter(b'u')), Response::Pass);
+    }
+
+    #[test]
+    fn chord_with_alt_or_meta_masks_the_lone_modifier() {
+        for (chord, modifier) in [("alt+u", Key::LeftAlt), ("meta+u", Key::RightMeta)] {
+            let mut harness = Harness::new(chord);
+            assert_eq!(harness.press(modifier), Response::Pass);
+            assert_eq!(
+                harness.press(Key::Letter(b'u')),
+                Response::Replace(vec![Output::Mask])
+            );
+            assert_eq!(harness.release(Key::Letter(b'u')), Response::swallow());
+            assert_eq!(harness.release(modifier), Response::Pass);
+        }
     }
 
     #[test]
