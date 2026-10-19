@@ -20,19 +20,14 @@ impl Table {
             Self::Unicode => unicode_char(code),
         }
     }
-
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Windows => "windows",
-            Self::Unicode => "unicode",
-        }
-    }
 }
 
 impl fmt::Display for Table {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.name())
+        f.write_str(match self {
+            Self::Windows => "windows",
+            Self::Unicode => "unicode",
+        })
     }
 }
 
