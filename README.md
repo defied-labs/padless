@@ -8,8 +8,8 @@ number row. It reproduces the Windows Alt+NumPad codes for laptops and compact k
 have no numeric keypad, and runs on Windows, macOS and Linux.
 
 Hold Alt, type `0233` on the number row, release Alt, and `é` is typed into the focused
-application. Short sequences such as Alt+1 still reach the application as the shortcut they
-were.
+application. Short sequences such as Alt+1 still reach the application as a shortcut when Alt
+is released.
 
 ## How it works
 
@@ -19,10 +19,12 @@ machine.
 - **Hold mode** (default). While the trigger key is held, number-row digits are held back. When
   the trigger is released, the digits are resolved to a character and typed. If fewer than
   `min_digits` digits were entered, the original key presses are replayed unchanged, so Alt+1
-  tab switching keeps working. Pressing any other key while digits are pending replays
+  tab switching keeps working, but the shortcut fires when the trigger is released rather than
+  when the digit is pressed. Pressing any other key while digits are pending replays
   everything as typed and stops capturing until the trigger is released.
 - **Leader mode**. A chord such as Ctrl+Shift+U starts capture. Digits are collected until
-  Enter or Space types the character, Escape cancels, or the timeout expires.
+  Enter or Space types the character, Escape cancels, or the timeout expires. Any other key
+  cancels capture and reaches the application as usual.
 
 The trigger itself is never delayed: Alt reaches applications immediately, so Alt+Tab and
 Alt+drag behave as usual. Only the digits are held back. When a code is typed after Alt alone,
@@ -208,9 +210,10 @@ WantedBy=graphical-session.target
 - **macOS**: Caps Lock cannot be the trigger, because macOS toggles it before event taps see
   it. Fields that enable Secure Input, such as password fields, disable event taps. F21 to F24
   do not exist.
-- **Shortcuts with many digits**: in hold mode, a trigger shortcut with at least `min_digits`
-  digits is consumed as a code. Raise `min_digits` or use leader mode if that conflicts with
-  something you use.
+- **Shortcuts with many digits**: in hold mode, digits typed under one press of the trigger
+  form one code. Alt+1 followed by Alt+2 without releasing Alt types the character for code 12
+  instead of switching tabs twice. Release the trigger between shortcuts, raise `min_digits`
+  or use leader mode if that conflicts with something you use.
 - **Code 0 and control characters**: code `0` types nothing. Windows-1252 control positions,
   such as `09`, type the control character, as Windows does.
 
