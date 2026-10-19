@@ -97,7 +97,7 @@ chord = "ctrl+shift+u"
 timeout_ms = 3000
 
 [aliases]
-"0" = "°"
+"00" = "°"
 "8594" = "→"
 "42" = "¯\\_(ツ)_/¯"
 ```
@@ -122,6 +122,8 @@ conflict with common setups:
   characters such as `@`, `{` or `€`.
 - A leader chord with `ctrl+alt`: Windows reports AltGr as Ctrl+Alt.
 - `min_digits = 1`: single-digit shortcuts such as Alt+1 are captured.
+- An alias with fewer digits than `min_digits`: hold mode replays it as a shortcut, so it can
+  only be typed in leader mode.
 
 `caps-lock` as a trigger is swallowed when pressed. A tap without digits is replayed, so Caps
 Lock still toggles.

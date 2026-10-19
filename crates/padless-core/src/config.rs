@@ -245,6 +245,7 @@ pub enum ConfigWarning {
     TriggerIsAltGr,
     ChordMatchesAltGr,
     SingleDigitShortcutsCaptured,
+    AliasesBelowMinDigits,
 }
 
 impl fmt::Display for ConfigWarning {
@@ -260,6 +261,9 @@ impl fmt::Display for ConfigWarning {
             }
             Self::SingleDigitShortcutsCaptured => {
                 "min_digits = 1 captures single-digit shortcuts such as alt+1"
+            }
+            Self::AliasesBelowMinDigits => {
+                "some aliases have fewer digits than min_digits and cannot be typed in hold mode"
             }
         })
     }
@@ -347,6 +351,13 @@ impl Config {
                 }
                 if self.min_digits == 1 {
                     warnings.push(ConfigWarning::SingleDigitShortcutsCaptured);
+                }
+                if self
+                    .aliases
+                    .keys()
+                    .any(|code| code.digits().len() < self.min_digits)
+                {
+                    warnings.push(ConfigWarning::AliasesBelowMinDigits);
                 }
             }
             Mode::Leader => {
@@ -516,6 +527,22 @@ mod tests {
         );
         assert_eq!(
             parse("mode = \"leader\"\ntrigger = \"right-alt\"").warnings(),
+            Vec::<ConfigWarning>::new()
+        );
+    }
+
+    #[test]
+    fn warns_about_aliases_hold_mode_cannot_reach() {
+        assert_eq!(
+            parse("[aliases]\n\"0\" = \"x\"").warnings(),
+            [ConfigWarning::AliasesBelowMinDigits]
+        );
+        assert_eq!(
+            parse("[aliases]\n\"00\" = \"x\"").warnings(),
+            Vec::<ConfigWarning>::new()
+        );
+        assert_eq!(
+            parse("mode = \"leader\"\n[aliases]\n\"0\" = \"x\"").warnings(),
             Vec::<ConfigWarning>::new()
         );
     }
