@@ -2,6 +2,7 @@
 
 mod settings;
 
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -80,6 +81,7 @@ fn init_logging(verbose: u8) {
     tracing_subscriber::fmt()
         .with_max_level(level)
         .with_target(false)
+        .with_ansi(std::io::stderr().is_terminal())
         .with_writer(std::io::stderr)
         .init();
 }
