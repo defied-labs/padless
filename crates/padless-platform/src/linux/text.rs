@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use evdev::KeyCode;
 use padless_core::KeyAction;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use super::VirtualKeyboard;
 use super::keymap::HEX_DIGITS;
@@ -18,6 +18,7 @@ pub(super) enum TextOutput {
     X11(Box<X11Typer>),
     Wayland(WaylandTyper),
     UnicodeInput,
+    Unavailable,
 }
 
 enum Session {
@@ -29,16 +30,21 @@ impl TextOutput {
     pub(super) fn detect() -> Self {
         match session() {
             Some(Session::X11) => match X11Typer::connect() {
-                Ok(typer) => return Self::X11(Box::new(typer)),
-                Err(error) => info!("X11 text output unavailable: {error}"),
+                Ok(typer) => Self::X11(Box::new(typer)),
+                Err(error) => {
+                    debug!("X11 text output unavailable: {error}");
+                    Self::UnicodeInput
+                }
             },
             Some(Session::Wayland) => match WaylandTyper::connect() {
-                Ok(typer) => return Self::Wayland(typer),
-                Err(error) => info!("Wayland virtual keyboard unavailable: {error}"),
+                Ok(typer) => Self::Wayland(typer),
+                Err(error) => {
+                    debug!("Wayland virtual keyboard unavailable: {error}");
+                    Self::UnicodeInput
+                }
             },
-            None => info!("no graphical session detected"),
+            None => Self::Unavailable,
         }
-        Self::UnicodeInput
     }
 
     pub(super) fn name(&self) -> &'static str {
@@ -46,6 +52,7 @@ impl TextOutput {
             Self::X11(_) => "X11 XTest",
             Self::Wayland(_) => "the Wayland virtual keyboard protocol",
             Self::UnicodeInput => "Ctrl+Shift+U hex input",
+            Self::Unavailable => "nothing until a graphical session is available",
         }
     }
 
@@ -55,6 +62,13 @@ impl TextOutput {
         keyboard: &mut VirtualKeyboard,
         after_key_events: bool,
     ) -> io::Result<()> {
+        if matches!(self, Self::UnicodeInput | Self::Unavailable) {
+            let previous = self.name();
+            *self = Self::detect();
+            if self.name() != previous {
+                info!("typing text through {}", self.name());
+            }
+        }
         match self {
             Self::X11(typer) => {
                 if after_key_events {
@@ -78,6 +92,10 @@ impl TextOutput {
                 }
             },
             Self::UnicodeInput => type_unicode_input(text, keyboard),
+            Self::Unavailable => {
+                warn!("no graphical session detected, so the code was not typed");
+                Ok(())
+            }
         }
     }
 }

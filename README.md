@@ -157,10 +157,15 @@ Log out and back in, or reboot, for the group change and udev rule to apply. Mem
 
 Typed text uses the first method that works:
 
-1. X11 sessions: XTest, with the character bound temporarily to an unused keycode.
+1. X11 sessions: XTest on the local display, with the character bound temporarily to an
+   unused keycode. Remote displays, such as those forwarded over SSH, are not used.
 2. Wayland sessions: the `zwp_virtual_keyboard_v1` protocol, if the compositor offers it.
-3. Otherwise: Ctrl+Shift+U followed by the hex code point and Space, which GTK applications
-   and IBus understand.
+3. Other graphical sessions: Ctrl+Shift+U followed by the hex code point and Space, which GTK
+   applications and IBus understand.
+
+Outside a graphical session, for example on the text console, codes are captured but nothing
+is typed. While padless is on the Ctrl+Shift+U fallback or has no session, it checks again
+before typing each code, so it switches to a better method once one becomes available.
 
 The session is detected from `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY` and `DISPLAY`, so a
 service must inherit them. With systemd, run padless as a user service in a session that
@@ -187,6 +192,8 @@ WantedBy=graphical-session.target
   applications without IBus generally do not.
 - **Ctrl+Shift+U fallback**: hex digits are sent as key positions, which assumes a layout
   where the number row and `a` to `f` produce those characters, as US and QWERTZ layouts do.
+  Terminals that do not handle Ctrl+Shift+U receive it as Ctrl+U, which erases the command
+  line in most shells.
 - **Linux devices**: keyboards connected after padless starts are not captured until it is
   restarted. Devices that report pointer events as well as keys, such as some wireless combo
   receivers, are skipped rather than grabbed, so padless does not work on them.
